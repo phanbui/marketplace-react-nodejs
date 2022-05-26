@@ -1,0 +1,146 @@
+1. remark
+
+before, in mvc, we do normal auth with passport, ...
+traditionally, we store auth stuff in session, cookie
+but now, frontend and backend are not as close as before, server 
+  is stateless
+token is made from hashing private key and user data, only server 
+  know the private key
+same key and same user data always generate same token, otherwise 
+  different token => token cannot be faked by outsider
+now, backend generate token, frontend store that token and attach 
+  token when send request, when backend receive request, it will 
+  authenticate by validating the token
+
+2. frontend context
+
+make login form, register form
+create context, read docs, shared/context/auth-context.js, context
+  include isLoggedIn, login, logout 
+wrap auth context provider around app, bind the value = {isLoggedIn:
+  isLoggedIn, login: login, logout: logout}
+isLoggedIn is a hook, login is callback function set isLoggedIn true,
+  logout is function set isLoggedIn false
+when click login or regiter, call login then redirect to '/'
+when click logout, call logout then redirect to '/'
+change navbar accroding to context
+when not logged in, dont sohwo edit, delete on card, dont show new 
+  listing
+
+3. backend model, register and login, no token yet
+  
+user model has password field, email field, array of listing field
+npm mongoose unique for email
+use bcrypt for user password, when register then bcrypt hash and salt, 
+  when login then bcrypt compare
+listing model has email field, seller field
+register route: take req body, see if email exist, if yes then return 
+  json error
+  otherwise, make new user, return wanted attribute {id, email} as
+  json
+login route: find user by email then check for pw, do the same  as 
+  register
+
+after register or login in backend, in frontend, login the user, set 
+  userId hook to userId from data received
+
+4. frontend register and login, no token yet
+
+in App: login callback function has id as argument, when login, set
+  userId hook to that id and isLoggedIn hook to true, when logout set 
+  userId hook to null and isLoggedIn hook to false
+in login page: send post request to backend with req body of email 
+  and password and get back the response data (userId and userEmail)
+  do login(responseData.userId)
+do same thind with register
+
+5. backend generate token and send to frontend
+
+register route: create token by doing jwt.sign of {userId, userEmail}, 
+  private key (.env) and option (expire in 1 hr)
+  fix the response json to {userId, userEmail, token}
+login route: do the same
+
+6. frontend recieve token when login and attach token to request
+
+when click login or regiser: fetch and receive userId, userEmail, 
+  token from backend
+login(userId, userEmail, token)
+change isLoggedIn hook in App to token, change the logic follow 
+  with it
+add token, userId to context provider {value}, add them to auth 
+  context as well
+in context provider {value}, isLoggedIn is !!token (true when 
+  there is a token and false otherwise)
+when send request (new, edit, del), attach 'bearer ' + auth.token
+  to authorization in headers
+
+7. backend route protection, middleware verify token
+
+implement middleware in middleware/check-auth.js
+extract token from req
+token is in headers instead of body or params
+req.headers.authorization.split(' ')[1], this is because the 
+  convention of authorization is like 'bearer token'
+jwt.verify(token, privatekey) to get the decoded token (payload)
+attach req.userData = {id, email} for authorization later
+wrap things in a try catch, if no token then next(error)
+add middleware to new, edit, delete route
+now if not auth then cannot access new, edit, delete route
+
+8. authorization
+
+the check-auth middleware has already attach userId and userEmail 
+  to req.userData
+when edit or delete, check if that userId is the same with seller
+  id of the listng, use .equals instead of ===, if not the same 
+  return json error
+
+9. store token in browser, auto login
+
+now when we refresh, we have to login again bc context is only 
+  stored in memory
+we can store in cookie, session, local, session will be gone when
+  close browser, cookie is not as ez to use, local is good
+xss can read local storage and steal token
+react has built in sanitize for xss
+localStorage.setItem('userData', JSON.stringify({userId: userId,
+  token: token})), do this when login
+when app start, login the user, do useEffect 
+store_user_data = JSON.parse(localStorage.getItem('userData))
+if there is store_user_data then login the user
+when logout then clear the local storage
+localStorage.removeItem('userData')
+
+10. add logic, seed, hide edit delete button if not owner
+
+when add a new listing, listing email is email of the user, 
+  listing seller is id of the user, push listing id to user's
+  array of listings
+when delete listing then unlink with user, delete cloudinary
+listings can now have some more attribute, condition, description, 
+  postal code, picture show some attribute in show page only, not
+  index page
+flow from now on will work normally but previous seeds dont work 
+  anymore, delete all users and listings, add some users and then 
+  some listings manually
+hide edit, del from card if current user is not the seller of the
+  listing
+when token expire, authentication fail and return json error, if 
+  frontend receive json error, navigate to login
+
+11. remark
+
+it is very important when fetch in useEffect, the component need
+  to wait for fetch finished and receive the data before display
+  the data or use it for anything, use another hook (isLoading)
+  for this
+when we want parent component change if child component change, 
+  in parent component, add prop change={setSomething} to child 
+  component, and pass that prop as down as deep as we want, when 
+  child component change, call props.change(data)
+it is very important to have the correct header for any request, 
+  in some case, we use multer and upload middleware (we dont use
+  body parser), then we dont need header (header only work for 
+  some kind of request and req body, for special kind, we need 
+  to use speacial middleware)
