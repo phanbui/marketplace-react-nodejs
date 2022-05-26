@@ -1,5 +1,5 @@
 To run backend:
-- add .env file and add JWT_SECRET_KEY, create cloudinary account and add       CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+- add .env file and add JWT_SECRET_KEY, create cloudinary account and add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 - run mongodb server
 - npm install
 - node app.js 
